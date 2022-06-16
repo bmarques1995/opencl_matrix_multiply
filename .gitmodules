@@ -1,0 +1,6 @@
+[submodule "vendor/eigen3"]
+	path = vendor/eigen3
+	url = https://gitlab.com/libeigen/eigen.git
+[submodule "vendor/opencl_wrapper"]
+	path = vendor/opencl_wrapper
+	url = https://github.com/bmarques1995/opencl_wrapper.git
