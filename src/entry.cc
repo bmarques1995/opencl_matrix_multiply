@@ -1,14 +1,19 @@
 #include <iostream>
 #include <Eigen/Dense>
 #include <CL/cl.h>
+#include <chrono>
 #include <OpenCLWrapperLog.hpp>
 
 #include "Utils/FileHandler.hh"
+#include "Utils/EigenBenchmark.hh"
+#include "Utils/Timer.hh"
 #include "Classes/CLContext.hh"
 #include "Classes/CLKernel.hh"
 #include "Classes/CLBuffer.hh"
 
-//Eigen armazena matrizes no modo column major por padrão
+using std::chrono::steady_clock;
+
+//Eigen armazena matrizes no modo column major por padrï¿½o
 
 int main()
 {
@@ -16,20 +21,22 @@ int main()
 	Eigen::MatrixXf matrixA;
 	Eigen::MatrixXf matrixB;
 
-	matrixA.resize(2, 2);
-	matrixA << 0, 1, -6, -5;
+	EigenBenchmark::PushElements(600, &matrixA);
+	EigenBenchmark::PushElements(600, &matrixB);
 
-	matrixB.resize(2, 2);
-	matrixB << 7, 3, - 8, - 9;
+	Eigen::MatrixXf matrixC;
+	
+	Timer::Start();
+	matrixC = matrixA * matrixB;
+	Timer::End();
+	Timer::Log();
 
-	Eigen::MatrixXf matrixC = matrixA * matrixB;
 	Eigen::MatrixXf matrixCOpenCL;
 
 	matrixCOpenCL.resize(matrixA.cols(), matrixB.rows());
 
-	std::cout << matrixC << "\n";
+	//std::cout << matrixC << "\n";
 
-	
 	std::cout << "Initializing OpenCL device...\n";
 	
 	int status;
@@ -58,11 +65,16 @@ int main()
 
 	status = CL_SUCCESS;
 
+	Timer::Start();
+
 	status |= kernel->PushArg(0, sizeof(cl_mem), (void*)&(matrix_C->GetBuffer()));
 	status |= kernel->PushArg(1, sizeof(cl_mem), (void*)&(matrix_B->GetBuffer()));
 	status |= kernel->PushArg(2, sizeof(cl_mem), (void*)&(matrix_A->GetBuffer()));
 	status |= kernel->PushArg(3, sizeof(int), (void*)&wA);
 	status |= kernel->PushArg(4, sizeof(int), (void*)&wC);
+
+	Timer::End();
+	Timer::Log();
 
 	if (status != CL_SUCCESS)
 	{
@@ -70,7 +82,11 @@ int main()
 		return EXIT_FAILURE;
 	}
 
+	Timer::Start();
 	status = kernel->ExecuteQueue(context->GetCommands());
+
+	Timer::End();
+	Timer::Log();
 
 	if (status != CL_SUCCESS)
 	{
@@ -78,9 +94,14 @@ int main()
 		return EXIT_FAILURE;
 	}
 
+	Timer::Start();
 	matrix_C->ExportToCPU(context->GetCommands(), matrixCOpenCL.data(), matrixCOpenCL.size() * sizeof(float));
+	Timer::End();
+	Timer::Log();
 
-	std::cout << matrixCOpenCL << "\n";
+	//std::cout << matrixCOpenCL << "\n";
+
+	std::cout << matrixC.isApprox(matrixCOpenCL, .0001f) << "\n";
 
 	delete matrix_A;
 	delete matrix_B;
